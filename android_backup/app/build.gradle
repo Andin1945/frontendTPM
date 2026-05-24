@@ -1,0 +1,24 @@
+android {
+    namespace "com.example.smartpay_ai"
+    compileSdkVersion 34
+
+    defaultConfig {
+        applicationId "com.example.smartpay_ai"
+        minSdkVersion 21
+        targetSdkVersion 34
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+}
