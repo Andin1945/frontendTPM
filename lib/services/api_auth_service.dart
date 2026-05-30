@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiAuthService {
-  static const String baseUrl = "http://192.168.0.108:3000";
+  static const String baseUrl = "http://192.168.0.100:3000";
 
   Future<Map<String, dynamic>> register({
     required String username,
@@ -118,6 +118,54 @@ class ApiAuthService {
       return {
         "success": false,
         "message": "Gagal ganti kode akses",
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> changePin({
+    required int userId,
+    required String oldPin,
+    required String newPin,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse("$baseUrl/change-pin"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "user_id": userId,
+          "old_pin": oldPin,
+          "new_pin": newPin,
+        }),
+      );
+
+      return jsonDecode(res.body);
+    } catch (e) {
+      return {
+        "success": false,
+        "message": "Gagal ganti PIN",
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> setPin({
+    required int userId,
+    required String pin,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse("$baseUrl/set-pin"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "user_id": userId,
+          "pin": pin,
+        }),
+      );
+
+      return jsonDecode(res.body);
+    } catch (e) {
+      return {
+        "success": false,
+        "message": "Gagal membuat PIN",
       };
     }
   }

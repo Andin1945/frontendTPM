@@ -6,11 +6,13 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+<uses-permission android:name="android.permission.CAMERA"/>
 
     <application
         android:label="smartpay_ai"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+	android:enableOnBackInvokedCallback="true"
         android:usesCleartextTraffic="true">
 
         <meta-data

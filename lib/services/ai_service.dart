@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class AIService {
-  static const String baseUrl = "http://192.168.0.108:3000";
+  static const String baseUrl = "http://192.168.0.100:3000";
 
   Future<String> askAI({
     required String message,

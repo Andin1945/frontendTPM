@@ -17,9 +17,15 @@ class MapsScreen extends StatefulWidget {
 class _MapsScreenState extends State<MapsScreen> {
   final MapController mapController = MapController();
 
-  LatLng currentLocation = LatLng(-6.200000, 106.816666);
-  bool loading = true;
-  String address = "Mencari alamat...";
+  LatLng currentLocation = const LatLng(-7.797068, 110.370529);
+
+  bool loading = false;
+  String address = "Tap peta atau tekan Lokasi Saya";
+
+  final Color bgDark = const Color(0xff0F1020);
+  final Color cardDark = const Color(0xff1A1B2E);
+  final Color primary = const Color(0xff7C5CFF);
+  final Color secondary = const Color(0xff00D1FF);
 
   @override
   void initState() {
@@ -29,11 +35,20 @@ class _MapsScreenState extends State<MapsScreen> {
 
   Future<void> getCurrentLocation() async {
     try {
+      setState(() {
+        loading = true;
+        address = "Mengambil lokasi...";
+      });
+
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
       if (!serviceEnabled) {
-        setState(() => loading = false);
-        showMessage("GPS belum aktif");
+        setState(() {
+          loading = false;
+          address = "GPS belum aktif";
+        });
+        showMessage("Aktifkan GPS terlebih dahulu");
+        await Geolocator.openLocationSettings();
         return;
       }
 
@@ -43,47 +58,80 @@ class _MapsScreenState extends State<MapsScreen> {
         permission = await Geolocator.requestPermission();
       }
 
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        setState(() => loading = false);
+      if (permission == LocationPermission.denied) {
+        setState(() {
+          loading = false;
+          address = "Izin lokasi ditolak";
+        });
         showMessage("Izin lokasi ditolak");
         return;
       }
 
-      final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          loading = false;
+          address = "Izin lokasi ditolak permanen";
+        });
+        showMessage("Aktifkan izin lokasi dari pengaturan aplikasi");
+        await Geolocator.openAppSettings();
+        return;
+      }
+
+      Position? position = await Geolocator.getLastKnownPosition();
+
+      position ??= await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 15),
       );
 
-      currentLocation = LatLng(pos.latitude, pos.longitude);
-
-      await getAddressFromLatLng();
+      currentLocation = LatLng(
+        position.latitude,
+        position.longitude,
+      );
 
       setState(() => loading = false);
 
       mapController.move(currentLocation, 16);
+
+      await getAddressFromLatLng();
     } catch (e) {
-      setState(() => loading = false);
-      showMessage("Gagal mengambil lokasi");
+      setState(() {
+        loading = false;
+        address = "Gagal mengambil lokasi";
+      });
+      showMessage("Gagal mengambil lokasi. Coba tekan Lokasi Saya lagi.");
     }
   }
 
   Future<void> getAddressFromLatLng() async {
     try {
-      final url =
-          "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${currentLocation.latitude}&lon=${currentLocation.longitude}";
+      setState(() => address = "Mencari alamat...");
+
+      final url = Uri.parse(
+        "https://nominatim.openstreetmap.org/reverse"
+        "?format=jsonv2"
+        "&lat=${currentLocation.latitude}"
+        "&lon=${currentLocation.longitude}",
+      );
 
       final res = await http.get(
-        Uri.parse(url),
+        url,
         headers: {
-          "User-Agent": "smartpay_ai",
+          "User-Agent": "smartpay-ai-flutter",
         },
       );
 
-      final data = jsonDecode(res.body);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
 
-      setState(() {
-        address = data["display_name"] ?? "Alamat tidak ditemukan";
-      });
+        setState(() {
+          address = data["display_name"] ?? "Alamat tidak ditemukan";
+        });
+      } else {
+        setState(() {
+          address = "Alamat tidak ditemukan";
+        });
+      }
     } catch (e) {
       setState(() {
         address = "Gagal mendapatkan alamat";
@@ -96,6 +144,8 @@ class _MapsScreenState extends State<MapsScreen> {
       currentLocation = point;
       address = "Mencari alamat...";
     });
+
+    mapController.move(point, mapController.camera.zoom);
 
     await getAddressFromLatLng();
   }
@@ -122,7 +172,11 @@ class _MapsScreenState extends State<MapsScreen> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text)),
+      SnackBar(
+        content: Text(text),
+        backgroundColor: cardDark,
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -130,21 +184,21 @@ class _MapsScreenState extends State<MapsScreen> {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
-    Color color = const Color(0xff5146b8),
+    Color? color,
   }) {
     return Expanded(
       child: SizedBox(
-        height: 48,
+        height: 50,
         child: ElevatedButton.icon(
           onPressed: onTap,
           icon: Icon(icon, size: 20),
           label: Text(label),
           style: ElevatedButton.styleFrom(
-            backgroundColor: color,
+            backgroundColor: color ?? primary,
             foregroundColor: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
             ),
           ),
         ),
@@ -155,182 +209,186 @@ class _MapsScreenState extends State<MapsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xffeef4ff),
+      backgroundColor: bgDark,
       appBar: AppBar(
-        title: const Text("Pilih Lokasi"),
-        backgroundColor: const Color(0xff5146b8),
+        title: const Text("Maps"),
+        backgroundColor: bgDark,
         foregroundColor: Colors.white,
         elevation: 0,
-      ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : Stack(
-              children: [
-                FlutterMap(
-                  mapController: mapController,
-                  options: MapOptions(
-                    initialCenter: currentLocation,
-                    initialZoom: 16,
-                    onTap: (tapPosition, point) async {
-                      await selectLocation(point);
-                    },
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate:
-                          "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                      userAgentPackageName: "com.example.smartpay_ai",
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: currentLocation,
-                          width: 90,
-                          height: 90,
-                          child: Column(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      blurRadius: 8,
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.location_on,
-                                  size: 42,
-                                  color: Color(0xff5146b8),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.12),
-                          blurRadius: 14,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: const [
-                        Icon(Icons.touch_app, color: Color(0xff5146b8)),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            "Tap area map untuk memilih lokasi",
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  bottom: 24,
-                  child: Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(26),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 18,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: const [
-                            CircleAvatar(
-                              backgroundColor: Color(0xffe9f2ff),
-                              child: Icon(
-                                Icons.place,
-                                color: Color(0xff5146b8),
-                              ),
-                            ),
-                            SizedBox(width: 12),
-                            Text(
-                              "Lokasi Dipilih",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          address,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.black87,
-                            height: 1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "${currentLocation.latitude.toStringAsFixed(6)}, ${currentLocation.longitude.toStringAsFixed(6)}",
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            actionButton(
-                              icon: Icons.my_location,
-                              label: "Lokasi Saya",
-                              onTap: getCurrentLocation,
-                            ),
-                            const SizedBox(width: 10),
-                            actionButton(
-                              icon: Icons.map,
-                              label: "Google Maps",
-                              color: Colors.green,
-                              onTap: openGoogleMaps,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+        actions: [
+          IconButton(
+            onPressed: getCurrentLocation,
+            icon: Icon(
+              Icons.my_location,
+              color: secondary,
             ),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          FlutterMap(
+            mapController: mapController,
+            options: MapOptions(
+              initialCenter: currentLocation,
+              initialZoom: 15,
+              onTap: (tapPosition, point) {
+                selectLocation(point);
+              },
+            ),
+            children: [
+              TileLayer(
+                urlTemplate:
+                    "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                userAgentPackageName: "com.example.smartpay_ai",
+              ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: currentLocation,
+                    width: 80,
+                    height: 80,
+                    child: Icon(
+                      Icons.location_on,
+                      size: 58,
+                      color: secondary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cardDark.withOpacity(0.95),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: primary.withOpacity(0.20),
+                    child: Icon(
+                      Icons.touch_app,
+                      color: secondary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      "Tap peta untuk memilih lokasi",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 24,
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: cardDark,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: Colors.white10),
+                boxShadow: [
+                  BoxShadow(
+                    color: primary.withOpacity(0.25),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: primary.withOpacity(0.20),
+                        child: Icon(
+                          Icons.place,
+                          color: secondary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          "Lokasi Dipilih",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (loading)
+                        SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: secondary,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    address,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "${currentLocation.latitude.toStringAsFixed(6)}, "
+                    "${currentLocation.longitude.toStringAsFixed(6)}",
+                    style: const TextStyle(
+                      color: Colors.white38,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      actionButton(
+                        icon: Icons.my_location,
+                        label: "Lokasi Saya",
+                        onTap: getCurrentLocation,
+                      ),
+                      const SizedBox(width: 10),
+                      actionButton(
+                        icon: Icons.map,
+                        label: "Google Maps",
+                        color: Colors.green,
+                        onTap: openGoogleMaps,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

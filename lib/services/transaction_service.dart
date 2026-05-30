@@ -2,12 +2,16 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class TransactionService {
-  static const String baseUrl = "http://192.168.0.108:3000";
+  static const String baseUrl = "http://192.168.0.100:3000";
 
   Future<List<dynamic>> getTransactions(int userId) async {
     try {
-      final res = await http.get(Uri.parse("$baseUrl/transactions/$userId"));
+      final res = await http.get(
+        Uri.parse("$baseUrl/transactions/$userId"),
+      );
+
       final data = jsonDecode(res.body);
+
       return data["success"] == true ? data["data"] : [];
     } catch (e) {
       return [];
@@ -23,7 +27,9 @@ class TransactionService {
     try {
       final res = await http.post(
         Uri.parse("$baseUrl/transactions"),
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: jsonEncode({
           "user_id": userId,
           "title": title,
@@ -33,6 +39,7 @@ class TransactionService {
       );
 
       final data = jsonDecode(res.body);
+
       return data["success"] == true;
     } catch (e) {
       return false;
@@ -41,8 +48,12 @@ class TransactionService {
 
   Future<bool> deleteTransaction(int id) async {
     try {
-      final res = await http.delete(Uri.parse("$baseUrl/transactions/$id"));
+      final res = await http.delete(
+        Uri.parse("$baseUrl/transactions/$id"),
+      );
+
       final data = jsonDecode(res.body);
+
       return data["success"] == true;
     } catch (e) {
       return false;
@@ -59,7 +70,9 @@ class TransactionService {
     try {
       final res = await http.post(
         Uri.parse("$baseUrl/transfer"),
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: jsonEncode({
           "user_id": userId,
           "phone": phone,
@@ -78,6 +91,55 @@ class TransactionService {
     }
   }
 
+  Future<bool> transferBool({
+    required int userId,
+    required String phone,
+    required double amount,
+    required String note,
+    required String pin,
+  }) async {
+    final res = await transfer(
+      userId: userId,
+      phone: phone,
+      amount: amount,
+      note: note,
+      pin: pin,
+    );
+
+    return res["success"] == true;
+  }
+
+  Future<Map<String, dynamic>> qrisPay({
+    required int userId,
+    required String receiverPhone,
+    required double amount,
+    required String pin,
+  }) async {
+    return transfer(
+      userId: userId,
+      phone: receiverPhone,
+      amount: amount,
+      note: "Pembayaran QRIS",
+      pin: pin,
+    );
+  }
+
+  Future<bool> qrisPayBool({
+    required int userId,
+    required String receiverPhone,
+    required double amount,
+    required String pin,
+  }) async {
+    final res = await qrisPay(
+      userId: userId,
+      receiverPhone: receiverPhone,
+      amount: amount,
+      pin: pin,
+    );
+
+    return res["success"] == true;
+  }
+
   Future<Map<String, dynamic>> setPin({
     required int userId,
     required String pin,
@@ -85,7 +147,9 @@ class TransactionService {
     try {
       final res = await http.post(
         Uri.parse("$baseUrl/set-pin"),
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: jsonEncode({
           "user_id": userId,
           "pin": pin,
@@ -109,7 +173,9 @@ class TransactionService {
     try {
       final res = await http.post(
         Uri.parse("$baseUrl/change-pin"),
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: jsonEncode({
           "user_id": userId,
           "old_pin": oldPin,
